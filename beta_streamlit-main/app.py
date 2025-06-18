@@ -3,6 +3,9 @@ import subprocess
 import sys
 import os
 
+# Railway port configuration
+PORT = int(os.environ.get("PORT", 8501))
+
 st.set_page_config(
     page_title="LAISA - Housing Assistant",
     page_icon=":robot_face:",

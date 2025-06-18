@@ -1,0 +1,10 @@
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "tox -e deploy"
+  },
+  "deploy": {
+    "startCommand": "tox -e railway",
+    "healthcheckTimeout": 300
+  }
+}

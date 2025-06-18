@@ -35,3 +35,8 @@ pytest>=8.0.0
 mypy>=1.10.0
 flake8>=7.0.0
 tox>=4.15.0
+
+
+pinecone>=3.0.0
+PyPDF2>=3.0.0
+pandas>=2.0.0

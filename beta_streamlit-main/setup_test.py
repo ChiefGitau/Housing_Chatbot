@@ -13,6 +13,33 @@ import time
 # Load environment variables
 load_dotenv()
 
+
+def is_railway_environment():
+    """Check if running on Railway."""
+    return os.getenv("RAILWAY_ENVIRONMENT") is not None
+
+def main():
+    """Run all setup tests."""
+    if is_railway_environment():
+        print("Running in Railway environment - skipping interactive tests")
+        # Only run critical tests that don't require user interaction
+        tests = [
+            ("Dependencies", run_dependency_check),
+            ("Environment Variables", test_environment_variables),
+        ]
+    else:
+        # Run all tests locally
+        tests = [
+            ("Dependencies", run_dependency_check),
+            ("Environment Variables", test_environment_variables),
+            ("OpenAI Connection", test_openai_connection),
+            ("OpenAI Embeddings", test_openai_embeddings),
+            ("Pinecone Connection", test_pinecone_connection),
+            ("Pinecone Operations", test_pinecone_operations)
+        ]
+
+
+
 def test_environment_variables() -> Tuple[bool, Dict[str, str]]:
     """Test if required environment variables are set."""
     print("Checking environment variables...")

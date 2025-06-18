@@ -1,0 +1,9 @@
+[build]
+cmd = "pip install tox && tox -e deploy"
+
+[start]
+cmd = "tox -e railway"
+
+[variables]
+PYTHONPATH = "."
+RAILWAY_ENVIRONMENT = "true"
