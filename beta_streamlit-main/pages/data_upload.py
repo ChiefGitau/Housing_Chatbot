@@ -8,6 +8,9 @@ from typing import List, Optional
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
+# Import global translation system
+from global_translations import t, display_language_selector
+
 from loguru import logger
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import (
@@ -25,13 +28,73 @@ from pinecone import Pinecone
 
 # Page configuration
 st.set_page_config(
-    page_title="Document Upload - LAISA",
-    page_icon=":penguin:",
+    page_title=f"{t('admin_only')} {t('data_upload')} - LAISA",
+    page_icon="🔒",
     layout="wide"
 )
 
-st.header(" Document Upload")
-st.markdown("**Upload documents to expand LAISA's knowledge base**")
+# Display language selector in sidebar
+with st.sidebar:
+    display_language_selector()
+
+# Admin section layout
+col1, col2 = st.columns([1, 3])
+
+with col1:
+    st.markdown(f"### 🔒 {t('admin_only')}")
+    st.markdown(f"**{t('data_upload')} Panel**")
+    st.markdown(f"*{t('restricted_access')}*")
+    st.divider()
+    
+    # PIN Authentication
+    st.markdown(f"**{t('enter_admin_pin')}:**")
+    admin_pin = st.text_input("PIN", type="password", max_chars=4, help="Enter the 4-digit admin PIN")
+    
+    # Check PIN
+    if admin_pin:
+        if admin_pin == "0000":
+            st.session_state.admin_authenticated = True
+            st.success(f"✅ {t('access_granted')}")
+        else:
+            st.session_state.admin_authenticated = False
+            st.error(f"❌ {t('invalid_pin')}")
+    else:
+        st.session_state.admin_authenticated = False
+    
+    st.divider()
+    
+    # Admin status and info
+    if st.session_state.get('admin_authenticated', False):
+        st.markdown(f"**📊 {t('admin_information')}:**")
+        st.info("Authenticated")
+        
+        st.markdown("**🔧 Functions:**")
+        st.markdown(f"""
+        - {t('upload_document')}
+        - System diagnostics
+        - Knowledge base management
+        """)
+    else:
+        st.markdown("**ℹ️ Access Requirements:**")
+        st.markdown("""
+        - Valid admin PIN required
+        - Authorized personnel only
+        - All actions are logged
+        """)
+    
+    st.divider()
+    st.caption("⚠️ Unauthorized access prohibited")
+    st.caption("📞 Contact IT for access issues")
+
+with col2:
+    if st.session_state.get('admin_authenticated', False):
+        st.header(f"📁 {t('upload_document')} to Knowledge Base")
+        st.markdown(f"**{t('upload_analysis')}**")
+    else:
+        st.header(f"🔒 {t('access_denied')}")
+        st.warning(f"{t('enter_admin_pin')} to access the document upload functionality.")
+        st.info("This page is for system administrators only.")
+        st.stop()
 
 def process_uploaded_files(uploaded_files) -> bool:
     """Process uploaded files in the background with minimal UI."""
@@ -44,7 +107,7 @@ def process_uploaded_files(uploaded_files) -> bool:
     
     try:
         # Initialize services
-        with st.spinner("Initializing services..."):
+        with st.spinner(f"{t('loading')}..."):
             pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
             embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         
@@ -55,7 +118,7 @@ def process_uploaded_files(uploaded_files) -> bool:
         status_text = st.empty()
         
         for i, uploaded_file in enumerate(uploaded_files):
-            status_text.text(f"Processing {uploaded_file.name}...")
+            status_text.text(f"{t('processing')} {uploaded_file.name}...")
             
             # Load document
             documents = load_document(uploaded_file)
@@ -86,7 +149,7 @@ def process_uploaded_files(uploaded_files) -> bool:
             return False
         
         # Upload to Pinecone
-        status_text.text(f"Uploading {len(all_chunks)} chunks to Pinecone...")
+        status_text.text(f"{t('upload_document')} {len(all_chunks)} chunks to Pinecone...")
         
         # Try LangChain first, fallback to direct upload
         try:
@@ -119,7 +182,7 @@ def process_uploaded_files(uploaded_files) -> bool:
             upload_method = "Direct"
         
         progress_bar.progress(1.0)
-        status_text.text("Upload completed!")
+        status_text.text(f"{t('upload_completed')}")
         
         # Show success metrics
         col1, col2, col3 = st.columns(3)
@@ -134,7 +197,7 @@ def process_uploaded_files(uploaded_files) -> bool:
         return True
         
     except Exception as e:
-        st.error(f"Upload failed: {e}")
+        st.error(f"{t('upload_failed')}: {e}")
         logger.error(f"Document upload error: {e}")
         return False
 
@@ -166,39 +229,65 @@ def load_document(uploaded_file) -> Optional[List]:
         logger.error(f"Error loading {uploaded_file.name}: {e}")
         return None
 
-# Main interface - simplified
-uploaded_files = st.file_uploader(
-    "**Drop your documents here**",
-    type=['pdf', 'txt', 'doc', 'docx', 'csv'],
-    accept_multiple_files=True,
-    help="Drag and drop files or click to browse. Supports: PDF, TXT, DOC, DOCX, CSV"
-)
+# Admin interface - only shown when authenticated in col2
+if st.session_state.get('admin_authenticated', False):
+    with col2:
+        st.divider()
+        
+        # Main file upload interface
+        uploaded_files = st.file_uploader(
+            f"**{t('drag_drop_files')}**",
+            type=['pdf', 'txt', 'doc', 'docx', 'csv'],
+            accept_multiple_files=True,
+            help=f"{t('supported_formats')}: PDF, TXT, DOC, DOCX, CSV"
+        )
 
-if uploaded_files:
-    st.write(f" **{len(uploaded_files)} file(s) selected:**")
-    for file in uploaded_files:
-        file_size = len(file.getvalue()) / 1024 / 1024  # MB
-        st.write(f"  • {file.name} ({file_size:.1f} MB)")
-    
-    if st.button("Upload to Knowledge Base", type="primary", use_container_width=True):
-        process_uploaded_files(uploaded_files)
-
-#
-# Show current system status
-if st.button(" Check System Status"):
-    with st.spinner("Checking connections..."):
-        try:
-            # Quick API checks
-            pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-            embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+        if uploaded_files:
+            st.write(f"📁 **{len(uploaded_files)} file(s) selected:**")
+            for file in uploaded_files:
+                file_size = len(file.getvalue()) / 1024 / 1024  # MB
+                st.write(f"  • {file.name} ({file_size:.1f} MB)")
             
-            # Test calls
-            test_embedding = embeddings.embed_query("test")
-            pc.list_indexes()
-            
-            st.success("All systems operational")
-            st.info(f" Ready to process documents → Index: small-blogs-emmbeddings-index | Dimensions: {len(test_embedding)}")
-            
-        except Exception as e:
-            st.error(f"❌System check failed: {e}")
-            st.info(" Run `python setup_test.py` in terminal for detailed diagnostics")
+            if st.button(f"🚀 {t('upload_document')} to Knowledge Base", type="primary", use_container_width=True):
+                process_uploaded_files(uploaded_files)
+        
+        st.divider()
+        
+        # Admin system status check
+        st.subheader(f"🔧 {t('system_status')}")
+        if st.button(f"🔍 {t('check_system_status')}"):
+            with st.spinner(f"{t('loading')}..."):
+                try:
+                    # Quick API checks
+                    pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+                    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+                    
+                    # Test calls
+                    test_embedding = embeddings.embed_query("test")
+                    pc.list_indexes()
+                    
+                    st.success(f"✅ {t('all_systems_operational')}")
+                    st.info(f"📊 Ready to process documents → Index: small-blogs-emmbeddings-index | Dimensions: {len(test_embedding)}")
+                    
+                except Exception as e:
+                    st.error(f"❌ {t('system_check_failed')}: {e}")
+                    st.info("💡 Run `python setup_test.py` in terminal for detailed diagnostics")
+        
+        # Admin information
+        st.divider()
+        st.subheader(f"ℹ️ {t('admin_information')}")
+        st.markdown(f"""
+        **{t('document_processing')}:**
+        - Chunk size: 1000 characters
+        - Chunk overlap: 200 characters
+        - Target index: small-blogs-emmbeddings-index
+        - Embedding model: text-embedding-3-small
+        
+        **{t('supported_formats')}:**
+        - PDF, TXT, DOC, DOCX, CSV
+        
+        **{t('security_note')}:**
+        - All uploads are logged
+        - Documents are processed and stored permanently
+        - Only upload authorized content
+        """)

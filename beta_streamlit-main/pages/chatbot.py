@@ -8,7 +8,10 @@ from streamlit_chat import message
 # Import our local multi-agent system
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
-from core import run_llm
+from core import run_llm, get_session_language
+
+# Import global translation system
+from global_translations import t, display_language_selector
 
 
 def reset():
@@ -143,11 +146,13 @@ def display_convo(user, bot):
             message(generated_response)
 
 
-@st.cache_data
 def laisa(prompt):
     """Process user input with multi-agent system and update chat history."""
     
     logger.info(f"Processing user prompt: {prompt[:50]}...")
+    
+    # Store current language preference before processing
+    current_lang_pref = st.session_state.get('user_language_preference', 'en')
     
     # Get AI response using local multi-agent system
     generated_response = get_ai_response(
@@ -180,12 +185,19 @@ def laisa(prompt):
         formatted_response += f"\n\n{sources_string}"
     
     # Add language info to response if available
+    language_changed = False
     if 'language_info' in generated_response:
         lang_info = generated_response['language_info']
         # Store language info for sidebar display
         st.session_state.last_language_info = lang_info
         if lang_info.get('translated', False):
-            formatted_response += f"\n\n*Translated from {lang_info.get('detected_language', 'unknown')} (confidence: {lang_info.get('confidence', 0):.1%})*"
+            formatted_response += f"\n\n*Translated from {lang_info.get('detected_language', 'unknown')} ({t('confidence')}: {lang_info.get('confidence', 0):.1%})*"
+        
+        # Check if language preference was automatically updated
+        new_lang_pref = st.session_state.get('user_language_preference', 'en')
+        if new_lang_pref != current_lang_pref:
+            language_changed = True
+            logger.info(f"Language preference changed from {current_lang_pref} to {new_lang_pref}")
 
     # Update session state
     st.session_state.chat_history.append({
@@ -196,10 +208,19 @@ def laisa(prompt):
     st.session_state.chat_answers_history.append(formatted_response)
 
     logger.info(f"Chat history updated. Total messages: {len(st.session_state.chat_history)}")
+    
+    # If language was automatically detected and changed, trigger a rerun to update all page text
+    if language_changed:
+        logger.info("Triggering page refresh due to language change")
+        st.rerun()
 
 
-st.header("LAISA - Housing Assistant 🏠🤖")
-st.markdown("*Multilingual AI assistant for housing-related questions*")
+st.header(f"LAISA - {t('housing_assistant')} 🏠🤖")
+st.markdown(f"*{t('multilingual_ai_assistant')}*")
+
+# Display language selector in sidebar
+with st.sidebar:
+    display_language_selector()
 
 # Initialize chat history
 if (
@@ -226,13 +247,13 @@ if prompt := st.chat_input("Ask me about housing laws, tenant rights, or regulat
 col1, col2, col3 = st.columns(3)
 
 with col2:
-    if st.button('Reset Chat :repeat:', use_container_width=True):
+    if st.button(f'{t("reset_chat")} :repeat:', use_container_width=True):
         reset()
         st.rerun()
 
 
 with st.sidebar:
-    st.markdown("### 🌐 Language Support")
+    st.markdown(f"### 🌐 {t('language_support')}")
     st.markdown("""
     LAISA automatically detects your language and responds accordingly:
     - 🇺🇸 English
@@ -249,26 +270,76 @@ with st.sidebar:
     - 🇷🇺 Russian
     """)
     
-    st.markdown("### 🏠 Topics I Can Help With")
-    st.markdown("""
-    - Tenant rights & responsibilities
-    - Landlord obligations
-    - Rental agreements & leases
-    - Housing regulations
-    - Eviction processes
-    - Property management laws
-    - Housing discrimination
+    st.markdown(f"### 🏠 {t('topics_help_with')}")
+    st.markdown(f"""
+    - {t('tenant_rights')}
+    - {t('landlord_obligations')}
+    - {t('rental_agreements')}
+    - {t('housing_regulations')}
+    - {t('eviction_processes')}
+    - {t('property_management')}
+    - {t('housing_discrimination')}
     """)
     
     if st.session_state.get("chat_answers_history"):
-        st.markdown("### 📝 Current Session")
-        st.info(f"Messages: {len(st.session_state['chat_answers_history'])}")
+        st.markdown(f"### 📝 {t('current_session')}")
+        st.info(f"{t('messages')}: {len(st.session_state['chat_answers_history'])}")
         
-        # Show language info for last message if available
-        if hasattr(st.session_state, 'last_language_info'):
-            lang_info = st.session_state.last_language_info
-            if lang_info.get('detected_language') != 'en':
-                st.success(f"🌐 Detected: {lang_info.get('detected_language', 'unknown').upper()}")
+        # Show language consistency info
+        try:
+            session_lang = get_session_language()
+            if session_lang.get('language') != 'en':
+                lang_code = session_lang.get('language', 'unknown').upper()
+                confidence = session_lang.get('confidence', 0)
+                source = session_lang.get('source', 'unknown')
+                # Indicate if confidence meets threshold
+                threshold_indicator = "✅" if confidence >= 0.7 else "⚠️"
+                st.success(f"🌐 {t('active_language')}: {lang_code} ({confidence:.1%}) {threshold_indicator}")
+                st.caption(f"{t('source')}: {source} | {t('translation_active') if confidence >= 0.7 else t('translation_inactive')}")
+                
+                # Show enhanced language info if available
+                if hasattr(st.session_state, 'last_language_info'):
+                    lang_info = st.session_state.last_language_info
+                    script = lang_info.get('script', 'Unknown')
+                    indicators = lang_info.get('indicators', [])
+                    alternatives = lang_info.get('alternatives', [])
+                    detection_method = lang_info.get('detection_method', 'unknown')
+                    
+                    if script != 'Unknown':
+                        st.caption(f"📝 Script: {script}")
+                    
+                    # Show detection method
+                    st.caption(f"⚙️ Method: {detection_method.replace('_', ' ').title()}")
+                    
+                    if indicators:
+                        st.caption(f"🔍 Indicators: {', '.join(indicators[:2])}")
+                    
+                    # Show statistical vs AI confidence if available
+                    analysis = lang_info.get('analysis', {})
+                    if analysis.get('statistical_confidence') or analysis.get('ai_confidence'):
+                        stat_conf = analysis.get('statistical_confidence', 0)
+                        ai_conf = analysis.get('ai_confidence', 0)
+                        if stat_conf > 0:
+                            st.caption(f"📊 Statistical: {stat_conf:.1%}")
+                        if ai_conf > 0:
+                            st.caption(f"🤖 AI: {ai_conf:.1%}")
+                    
+                    # Show alternative language candidates
+                    if alternatives:
+                        st.caption("**Alternative candidates:**")
+                        for i, alt in enumerate(alternatives[:2]):  # Show top 2 alternatives
+                            alt_lang = alt.get('language', 'unknown').upper()
+                            alt_conf = alt.get('confidence', 0)
+                            reasoning = alt.get('reasoning', 'unknown')
+                            st.caption(f"  {i+2}. {alt_lang}: {alt_conf:.1%} - {reasoning[:25]}{'...' if len(reasoning) > 25 else ''}")
+            else:
+                st.info("🇺🇸 Language: English (Default)")
+        except Exception as e:
+            # Fallback to original language info display
+            if hasattr(st.session_state, 'last_language_info'):
+                lang_info = st.session_state.last_language_info
+                if lang_info.get('detected_language') != 'en':
+                    st.success(f"🌐 Detected: {lang_info.get('detected_language', 'unknown').upper()}")
     
     # txt = display_hist(st.session_state["chat_answers_history"])
     # st.button(':white_check_mark:', on_click=hist_clicked(txt), key='change_hist')
