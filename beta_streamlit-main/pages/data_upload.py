@@ -81,10 +81,7 @@ with col1:
         - Authorized personnel only
         - All actions are logged
         """)
-    
-    st.divider()
-    st.caption("⚠️ Unauthorized access prohibited")
-    st.caption("📞 Contact IT for access issues")
+
 
 with col2:
     if st.session_state.get('admin_authenticated', False):
@@ -267,27 +264,9 @@ if st.session_state.get('admin_authenticated', False):
                     pc.list_indexes()
                     
                     st.success(f"✅ {t('all_systems_operational')}")
-                    st.info(f"📊 Ready to process documents → Index: small-blogs-emmbeddings-index | Dimensions: {len(test_embedding)}")
+
                     
                 except Exception as e:
                     st.error(f"❌ {t('system_check_failed')}: {e}")
-                    st.info("💡 Run `python setup_test.py` in terminal for detailed diagnostics")
+                    st.info(" Run `python setup_test.py` in terminal for detailed diagnostics")
         
-        # Admin information
-        st.divider()
-        st.subheader(f"ℹ️ {t('admin_information')}")
-        st.markdown(f"""
-        **{t('document_processing')}:**
-        - Chunk size: 1000 characters
-        - Chunk overlap: 200 characters
-        - Target index: small-blogs-emmbeddings-index
-        - Embedding model: text-embedding-3-small
-        
-        **{t('supported_formats')}:**
-        - PDF, TXT, DOC, DOCX, CSV
-        
-        **{t('security_note')}:**
-        - All uploads are logged
-        - Documents are processed and stored permanently
-        - Only upload authorized content
-        """)

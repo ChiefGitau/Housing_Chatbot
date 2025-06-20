@@ -48,7 +48,6 @@ def test_environment_variables() -> Tuple[bool, Dict[str, str]]:
         "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
         "PINECONE_API_KEY": os.getenv("PINECONE_API_KEY"),
         "PINECONE_ENVIRONMENT_REGION": os.getenv("PINECONE_ENVIRONMENT_REGION"),
-        "PINECONE_INDEX_NAME": os.getenv("PINECONE_INDEX_NAME")
     }
     
     missing_vars = []
